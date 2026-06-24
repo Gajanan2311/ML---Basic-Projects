@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RideSmart Colombo — Dynamic Fare Estimator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --yellow:#f5c518; --yellow-dk:#e6b800;
+    --bg:#0f0f0f; --surface:#1a1a1a; --surface2:#111;
+    --border:#2a2a2a; --text:#f0f0f0; --muted:#888; --dim:#444;
+    --green:#4caf50; --red:#f44336;
+    --green-bg:#0d1f0d; --amber-bg:#2e1f00;
+  }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; font-size:15px; line-height:1.6; }
+
+  /* Hero */
+  .hero { background:var(--surface); border-bottom:3px solid var(--yellow); padding:2rem 3rem 1.5rem; }
+  .hero-tag { font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--yellow); margin-bottom:.4rem; }
+  .hero h1 { font-size:2.4rem; font-weight:700; color:#fff; line-height:1.1; margin-bottom:.3rem; }
+  .hero p { color:var(--muted); font-size:.95rem; }
+
+  /* Layout */
+  .main { display:grid; grid-template-columns:1fr 1.15fr; gap:2rem; max-width:1100px; margin:2rem auto; padding:0 2rem; }
+
+  /* Labels */
+  .label { font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--yellow); margin-bottom:.7rem; display:flex; align-items:center; gap:8px; }
+  .step { background:var(--yellow); color:#0f0f0f; border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+
+  /* Cards */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.4rem; margin-bottom:1.1rem; }
+  .card-accent { background:var(--surface); border:1px solid var(--yellow); border-radius:12px; padding:1.4rem; margin-bottom:1.1rem; }
+
+  /* Route selector */
+  .route-grid { display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center; margin-bottom:1rem; }
+  .swap-btn { background:var(--surface2); border:1px solid var(--border); color:var(--yellow); border-radius:8px; padding:.5rem .7rem; cursor:pointer; font-size:18px; transition:background .2s; }
+  .swap-btn:hover { background:var(--border); }
+
+  /* Route info pill */
+  .route-info { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:.55rem 1rem; font-size:13px; color:var(--muted); display:flex; align-items:center; gap:8px; margin-bottom:1rem; min-height:38px; }
+  .route-info .dur { color:var(--yellow); font-weight:600; font-size:15px; }
+
+  /* Form fields */
+  .field { margin-bottom:1rem; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  select { width:100%; background:#111; border:1px solid var(--border); border-radius:8px; color:var(--text); padding:.5rem .75rem; font-size:14px; outline:none; appearance:none; cursor:pointer; transition:border-color .2s; }
+  select:hover, select:focus { border-color:var(--yellow); }
+  select option { background:#1a1a1a; }
+
+  /* Sliders */
+  .slider-row { display:flex; align-items:center; gap:12px; }
+  input[type=range] { flex:1; accent-color:var(--yellow); height:4px; background:var(--border); border:none; border-radius:4px; cursor:pointer; padding:0; }
+  .sval { font-size:13px; font-weight:600; color:var(--yellow); min-width:32px; text-align:right; }
+
+  /* Details */
+  details { margin-bottom:.8rem; }
+  summary { font-size:12px; color:var(--muted); cursor:pointer; padding:.4rem 0; list-style:none; display:flex; align-items:center; gap:6px; }
+  summary::before { content:'▶'; font-size:9px; color:var(--yellow); transition:transform .2s; }
+  details[open] summary::before { transform:rotate(90deg); }
+  .dbox { padding-top:.7rem; }
+
+  /* Button */
+  .btn { width:100%; background:var(--yellow); color:#0f0f0f; border:none; border-radius:8px; padding:.8rem; font-size:16px; font-weight:700; cursor:pointer; margin-top:.5rem; transition:background .2s, transform .1s; }
+  .btn:hover { background:var(--yellow-dk); }
+  .btn:active { transform:scale(.98); }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  /* Metrics */
+  .metrics { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1.1rem; }
+  .metric { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1.1rem 1.2rem; text-align:center; }
+  .metric.accent { border-color:var(--yellow); }
+  .mlbl { font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); margin-bottom:3px; }
+  .mval { font-size:1.9rem; font-weight:700; color:var(--yellow); line-height:1; }
+  .msub { font-size:11px; color:var(--dim); margin-top:3px; }
+
+  /* Alerts */
+  .alert { border-radius:0 8px 8px 0; padding:.85rem 1rem; margin-bottom:1.1rem; font-size:13px; line-height:1.5; }
+  .alert-surge    { background:var(--amber-bg); border-left:4px solid var(--yellow); color:#f0c060; }
+  .alert-discount { background:var(--green-bg); border-left:4px solid var(--green);  color:#80c980; }
+  .alert-neutral  { background:var(--surface);  border-left:4px solid var(--dim);    color:var(--muted); }
+
+  /* Breakdown */
+  .br { display:flex; justify-content:space-between; align-items:center; padding:.5rem 0; border-bottom:1px solid var(--border); font-size:13px; gap:8px; }
+  .br:last-child { border:none; }
+  .brk { color:var(--muted); flex-shrink:0; }
+  .brv { color:var(--text); font-weight:500; text-align:right; }
+  .br-total { border-top:1px solid var(--yellow)!important; margin-top:4px; padding-top:10px!important; }
+  .br-total .brk { color:var(--text); font-weight:600; }
+  .br-total .brv { color:var(--yellow); font-size:15px; }
+
+  /* Badges */
+  .badge { display:inline-block; border-radius:5px; padding:1px 8px; font-size:11px; font-weight:600; margin-left:6px; }
+  .bu { background:#1a2e1a; color:var(--green); }
+  .bd { background:#1a1a2e; color:#6699ff; }
+  .bn { background:#1e1e1e; color:var(--muted); }
+
+  /* Placeholder */
+  .placeholder { background:var(--surface); border:1px dashed var(--border); border-radius:12px; padding:3.5rem 2rem; text-align:center; color:var(--muted); }
+  .placeholder .icon { font-size:3rem; margin-bottom:.8rem; }
+  .placeholder p { font-size:14px; line-height:1.7; }
+
+  /* Loading */
+  .loading { text-align:center; padding:3rem; color:var(--muted); font-size:14px; }
+  .spinner { width:26px; height:26px; border:3px solid var(--border); border-top-color:var(--yellow); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto .8rem; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Error */
+  .err { background:#2e0d0d; border:1px solid var(--red); border-radius:8px; padding:1rem; color:#f88; font-size:13px; }
+
+  /* How it works */
+  .how { max-width:1100px; margin:0 auto 2.5rem; padding:0 2rem; }
+  .how-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:.8rem; }
+  .how-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.2rem; }
+  .how-step { font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:var(--yellow); margin-bottom:5px; }
+  .how-title { font-size:14px; font-weight:600; margin-bottom:5px; }
+  .how-desc { font-size:12px; color:var(--muted); line-height:1.6; }
+
+  footer { text-align:center; color:var(--dim); font-size:11px; padding:1.5rem; border-top:1px solid var(--surface); margin-top:.5rem; }
+  hr { border:none; border-top:1px solid var(--border); margin:.9rem 0; }
+  .hint { font-size:11px; color:var(--dim); margin-bottom:.7rem; }
+
+  @media(max-width:700px) {
+    .main, .how-grid { grid-template-columns:1fr; }
+    .hero { padding:1.5rem; }
+    .hero h1 { font-size:1.8rem; }
+    .route-grid { grid-template-columns:1fr auto 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag">🚖 AI-powered dynamic pricing · Colombo, Sri Lanka</div>
+  <h1>RideSmart Fare Estimator</h1>
+  <p>Pick your route across Colombo — get an ML-predicted base fare with real-time demand &amp; supply adjustments.</p>
+</div>
+
+<div class="main">
+
+  <!-- LEFT: Inputs -->
+  <div>
+    <div class="label"><span class="step">1</span> Your route</div>
+    <div class="card">
+      <div class="route-grid">
+        <div class="field" style="margin:0">
+          <label>From</label>
+          <select id="origin" onchange="onRouteChange()">
+            <option value="">Select pickup…</option>
+          </select>
+        </div>
+        <button class="swap-btn" onclick="swapLocations()" title="Swap">⇄</button>
+        <div class="field" style="margin:0">
+          <label>To</label>
+          <select id="dest" onchange="onRouteChange()">
+            <option value="">Select destination…</option>
+          </select>
+        </div>
+      </div>
+      <div class="route-info" id="route-info">
+        <span>Select origin and destination to see estimated travel time.</span>
+      </div>
+
+      <div class="field">
+        <label>Time of booking</label>
+        <select id="time" onchange="onRouteChange()">
+          <option>Morning</option>
+          <option>Afternoon</option>
+          <option>Evening</option>
+          <option>Night</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Vehicle type</label>
+        <select id="vehicle">
+          <option>Economy</option>
+          <option>Standard</option>
+          <option>Premium</option>
+        </select>
+      </div>
+
+      <details>
+        <summary>Rider profile (optional)</summary>
+        <div class="dbox">
+          <div class="field">
+            <label>Loyalty status</label>
+            <select id="loyalty">
+              <option>Regular</option><option>Silver</option>
+              <option>Gold</option><option>Platinum</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Driver rating — <span id="rat-lbl">4.2</span></label>
+            <div class="slider-row">
+              <input type="range" id="ratings" min="1" max="5" value="4.2" step="0.1"
+                     oninput="document.getElementById('rat-lbl').textContent=parseFloat(this.value).toFixed(1)">
+              <span class="sval">4.2</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Past rides — <span id="past-lbl">20</span></label>
+            <div class="slider-row">
+              <input type="range" id="past_rides" min="0" max="200" value="20" step="1"
+                     oninput="document.getElementById('past-lbl').textContent=this.value">
+              <span class="sval">20</span>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <hr>
+    <div class="label"><span class="step">2</span> Demand &amp; supply conditions</div>
+    <div class="card">
+      <p class="hint" id="lookup-hint">Auto-filled from historical averages once you select a route.</p>
+      <div class="field">
+        <label>Active riders in area — <span id="riders-lbl">60</span></label>
+        <div class="slider-row">
+          <input type="range" id="riders" min="10" max="150" value="60" step="1"
+                 oninput="document.getElementById('riders-lbl').textContent=this.value">
+          <span class="sval" id="riders-sval">60</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Available drivers — <span id="drivers-lbl">30</span></label>
+        <div class="slider-row">
+          <input type="range" id="drivers" min="5" max="100" value="30" step="1"
+                 oninput="document.getElementById('drivers-lbl').textContent=this.value">
+          <span class="sval" id="drivers-sval">30</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="estimate-btn" onclick="estimateFare()" disabled>Select a route to estimate →</button>
+  </div>
+
+  <!-- RIGHT: Output -->
+  <div id="output">
+    <div class="label">Fare estimate</div>
+    <div class="placeholder">
+      <div class="icon">🚖</div>
+      <p>Select your pickup and destination above,<br>then press <strong style="color:var(--yellow)">Estimate fare</strong>.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- How it works -->
+<div class="how">
+  <div class="label">How it works</div>
+  <div class="how-grid">
+    <div class="how-card">
+      <div class="how-step">Step 1</div>
+      <div class="how-title">Route → duration</div>
+      <div class="how-desc">Your origin and destination map to a pre-computed travel time (minutes) based on real Colombo road distances and typical traffic speeds (~22 kmph).</div>
+    </div>
+    <div class="how-card">
+      <div class="how-step">Step 2</div>
+      <div class="how-title">ML base fare prediction</div>
+      <div class="how-desc">A Linear Regression model (R²=0.87) uses the ride duration, vehicle type, and contextual features to predict the base fare.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-step">Step 3</div>
+      <div class="how-title">Dynamic pricing formula</div>
+      <div class="how-desc">Final fare = base × demand_mult × supply_mult. Three-zone quantile formula with 0.8–1.5× caps, matching your notebook's corrected implementation.</div>
+    </div>
+  </div>
+</div>
+
+<footer>RideSmart Colombo &nbsp;·&nbsp; ML-powered dynamic pricing &nbsp;·&nbsp; Flask + HTML</footer>
+
+<script>
+const API = 'http://127.0.0.1:5000/api';
+let currentDuration = null;
+let routeLoaded = false;
+
+// ── Populate place dropdowns ──────────────────────────────────────────────────
+async function loadPlaces() {
+  try {
+    const res    = await fetch(`${API}/places`);
+    const data   = await res.json();
+    const places = data.places;
+    ['origin','dest'].forEach(id => {
+      const sel = document.getElementById(id);
+      places.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = p;
+        sel.appendChild(opt);
+      });
+    });
+    // set sensible defaults
+    document.getElementById('origin').value = 'Colombo Fort Railway Station';
+    document.getElementById('dest').value   = 'Independence Square';
+    onRouteChange();
+  } catch(e) {
+    console.warn('Could not load places from server:', e.message);
+  }
+}
+
+// ── Swap origin ↔ destination ──────────────────────────────────────────────
+function swapLocations() {
+  const o = document.getElementById('origin');
+  const d = document.getElementById('dest');
+  [o.value, d.value] = [d.value, o.value];
+  onRouteChange();
+}
+
+// ── Update route info pill + auto-fill sliders when route/time changes ────────
+async function onRouteChange() {
+  const origin = document.getElementById('origin').value;
+  const dest   = document.getElementById('dest').value;
+  const time   = document.getElementById('time').value;
+  const info   = document.getElementById('route-info');
+  const btn    = document.getElementById('estimate-btn');
+
+  if (!origin || !dest || origin === dest) {
+    info.innerHTML = '<span>Select different origin and destination.</span>';
+    btn.disabled = true;
+    btn.textContent = 'Select a route to estimate →';
+    return;
+  }
+
+  info.innerHTML = '<span style="color:var(--dim)">Loading route info…</span>';
+
+  try {
+    const res  = await fetch(`${API}/route?origin=${encodeURIComponent(origin)}&dest=${encodeURIComponent(dest)}&time=${encodeURIComponent(time)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    currentDuration = data.duration_min;
+    routeLoaded     = true;
+
+    info.innerHTML = `
+      <span>🗺 ${data.origin} → ${data.destination}</span>
+      <span class="dur">⏱ ~${data.duration_min} min</span>
+      <span style="color:var(--dim);font-size:12px">${data.location_cat}</span>`;
+
+    // Auto-fill sliders
+    setSlider('riders',  data.avg_riders,  'riders-lbl',  'riders-sval');
+    setSlider('drivers', data.avg_drivers, 'drivers-lbl', 'drivers-sval');
+    document.getElementById('lookup-hint').textContent =
+      `Auto-filled: avg ${data.avg_riders} riders, ${data.avg_drivers} drivers for ${time} in ${data.location_cat} areas.`;
+
+    btn.disabled   = false;
+    btn.textContent = 'Estimate fare →';
+
+  } catch(e) {
+    info.innerHTML = `<span style="color:#f88">❌ ${e.message}</span>`;
+    btn.disabled = true;
+  }
+}
+
+function setSlider(id, val, lblId, svalId) {
+  document.getElementById(id).value = val;
+  document.getElementById(lblId).textContent  = val;
+  if (svalId) document.getElementById(svalId).textContent = val;
+}
+
+// ── Sync rating slider display ────────────────────────────────────────────────
+document.getElementById('ratings').addEventListener('input', function() {
+  const v = parseFloat(this.value).toFixed(1);
+  this.nextElementSibling.textContent = v;
+});
+document.getElementById('past_rides').addEventListener('input', function() {
+  this.nextElementSibling.textContent = this.value;
+});
+document.getElementById('riders').addEventListener('input', function() {
+  document.getElementById('riders-lbl').textContent = this.value;
+  document.getElementById('riders-sval').textContent = this.value;
+});
+document.getElementById('drivers').addEventListener('input', function() {
+  document.getElementById('drivers-lbl').textContent = this.value;
+  document.getElementById('drivers-sval').textContent = this.value;
+});
+
+// ── Badge helper ──────────────────────────────────────────────────────────────
+function badge(val) {
+  if (val > 1.05) return `<span class="badge bu">↑ ${val.toFixed(3)}x</span>`;
+  if (val < 0.95) return `<span class="badge bd">↓ ${val.toFixed(3)}x</span>`;
+  return `<span class="badge bn">= ${val.toFixed(3)}x</span>`;
+}
+
+function alertHtml(pct, time, origin) {
+  if (pct > 5)
+    return `<div class="alert alert-surge">⚡ Surge pricing active — high demand or low driver availability for <b>${time.toLowerCase()}</b> near <b>${origin}</b>. Fare increased by <b>${pct.toFixed(1)}%</b>.</div>`;
+  if (pct < -5)
+    return `<div class="alert alert-discount">✓ Low demand detected — <b>${Math.abs(pct).toFixed(1)}% discount</b> applied to the standard fare.</div>`;
+  return `<div class="alert alert-neutral">Standard conditions — demand and supply are balanced. No surge or discount.</div>`;
+}
+
+// ── Main estimate function ────────────────────────────────────────────────────
+async function estimateFare() {
+  const origin = document.getElementById('origin').value;
+  const dest   = document.getElementById('dest').value;
+  const time   = document.getElementById('time').value;
+  const out    = document.getElementById('output');
+
+  out.innerHTML = `<div class="label">Fare estimate</div>
+    <div class="loading"><div class="spinner"></div>Calculating your fare…</div>`;
+
+  const body = {
+    origin, destination: dest, time,
+    vehicle   : document.getElementById('vehicle').value,
+    loyalty   : document.getElementById('loyalty').value,
+    ratings   : document.getElementById('ratings').value,
+    past_rides: document.getElementById('past_rides').value,
+    riders    : document.getElementById('riders').value,
+    drivers   : document.getElementById('drivers').value,
+  };
+
+  try {
+    const res = await fetch(`${API}/predict`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+
+    const pct      = d.pct_change;
+    const pctColor = pct > 0 ? '#f5c518' : pct < 0 ? '#6699ff' : '#888';
+    const pctSign  = pct >= 0 ? '+' : '';
+
+    out.innerHTML = `
+    <div class="label">Fare estimate</div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="mlbl">Base fare</div>
+        <div class="mval">$${d.base_fare.toFixed(2)}</div>
+        <div class="msub">ML predicted</div>
+      </div>
+      <div class="metric accent">
+        <div class="mlbl">Dynamic fare</div>
+        <div class="mval">$${d.final_fare.toFixed(2)}</div>
+        <div class="msub">${pctSign}${pct.toFixed(1)}% adjustment</div>
+      </div>
+    </div>
+
+    ${alertHtml(pct, time, origin)}
+
+    <div class="card-accent">
+      <div class="label" style="margin-bottom:.7rem">Fare breakdown</div>
+      <div class="br"><span class="brk">🗺 Route</span>
+        <span class="brv" style="font-size:12px">${d.origin} → ${d.destination}</span></div>
+      <div class="br"><span class="brk">⏱ Travel time</span>
+        <span class="brv">${d.duration_min} min</span></div>
+      <div class="br"><span class="brk">Base predicted fare</span>
+        <span class="brv">$${d.base_fare.toFixed(2)}</span></div>
+      <div class="br">
+        <span class="brk">Demand multiplier ${badge(d.demand_mult)}</span>
+        <span class="brv" style="font-size:11px;color:#555">
+          ${parseInt(body.riders)} riders · Q25:${d.thresholds.demand_q25} Q75:${d.thresholds.demand_q75}
+        </span>
+      </div>
+      <div class="br">
+        <span class="brk">Supply multiplier ${badge(d.supply_mult)}</span>
+        <span class="brv" style="font-size:11px;color:#555">
+          ${parseInt(body.drivers)} drivers · Q25:${d.thresholds.supply_q25} Q75:${d.thresholds.supply_q75}
+        </span>
+      </div>
+      <div class="br">
+        <span class="brk">Combined adjustment</span>
+        <span class="brv">${d.combined_mult.toFixed(3)}x
+          <span style="color:${pctColor}">(${pctSign}${pct.toFixed(1)}%)</span>
+        </span>
+      </div>
+      <div class="br br-total">
+        <span class="brk">Final dynamic fare</span>
+        <span class="brv">$${d.final_fare.toFixed(2)}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:.7rem">Ride conditions</div>
+      <div class="br"><span class="brk">🕐 Time</span><span class="brv">${time}</span></div>
+      <div class="br"><span class="brk">🚗 Vehicle</span><span class="brv">${body.vehicle}</span></div>
+      <div class="br"><span class="brk">👥 Riders in area</span><span class="brv">${body.riders}</span></div>
+      <div class="br"><span class="brk">🚕 Drivers available</span><span class="brv">${body.drivers}</span></div>
+    </div>
+
+    <p style="font-size:11px;color:#333;margin-top:.4rem">
+      Goal 1: Linear Regression (R²=0.8749, MAE=$52.56) &nbsp;|&nbsp;
+      Goal 2: Three-zone demand/supply formula (caps: 0.8–1.5×)
+    </p>`;
+
+  } catch(e) {
+    out.innerHTML = `<div class="label">Fare estimate</div>
+      <div class="err">❌ <b>Could not connect to the server.</b><br><br>
+        Make sure <code>server.py</code> is running:<br>
+        <code style="color:#f5c518">python server.py</code><br><br>
+        Error: ${e.message}
+      </div>`;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadPlaces();
+</script>
+</body>
+</html>
